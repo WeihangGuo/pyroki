@@ -12,16 +12,16 @@ from robot_descriptions.loaders.yourdfpy import load_robot_description
 from viser.extras import ViserUrdf
 
 import pyroki_snippets as pks
-
+import yourdfpy 
 
 def main():
     """Main function for basic IK."""
-
-    # urdf = load_robot_description("panda_description")
-    # target_link_name = "panda_hand"
-
-    urdf = load_robot_description("ur5_description")
-    target_link_name = "ee_link"
+    urdf_path = "examples/assets/franka/fp3_franka_hand.urdf"
+    mesh_dir = "examples/assets/franka/meshes"
+    urdf = yourdfpy.URDF.load(urdf_path, mesh_dir=mesh_dir)
+    target_link_name = "fp3_hand"
+    # urdf = load_robot_description("ur5_description")
+    # target_link_name = "ee_link"
     # Create robot.
     robot = pk.Robot.from_urdf(urdf)
 
