@@ -16,12 +16,20 @@ import yourdfpy
 
 def main():
     """Main function for basic IK."""
+
+    # Load the spherized panda urdf do not work!!!
+    # urdf_path = "examples/assets/panda/smaller_panda_spherized.urdf"
+    # mesh_dir = "examples/assets/panda/meshes"
+    # target_link_name = "panda_hand"
+
     urdf_path = "examples/assets/franka/fp3_franka_hand.urdf"
     mesh_dir = "examples/assets/franka/meshes"
-    urdf = yourdfpy.URDF.load(urdf_path, mesh_dir=mesh_dir)
     target_link_name = "fp3_hand"
+    urdf = yourdfpy.URDF.load(urdf_path, mesh_dir=mesh_dir)
+
     # urdf = load_robot_description("ur5_description")
     # target_link_name = "ee_link"
+
     # Create robot.
     robot = pk.Robot.from_urdf(urdf)
 
@@ -31,7 +39,7 @@ def main():
     urdf_vis = ViserUrdf(server, urdf, root_node_name="/base")
 
     # Add the collision mesh to the visualizer.
-    robot_coll = pk.collision.RobotCollision.from_urdf(urdf)
+    robot_coll = pk.collision.RobotCollision.from_urdf(urdf, multisphere=False)
 
     # Create interactive controller with initial position.
     ik_target = server.scene.add_transform_controls(
