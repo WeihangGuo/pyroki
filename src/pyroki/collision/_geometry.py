@@ -346,6 +346,14 @@ class Capsule(CollGeom):
         assert capsule.get_batch_axes() == sph_0.get_batch_axes()
         return capsule
 
+@jdc.pytree_dataclass
+class Multisphere(CollGeom):
+    @staticmethod
+    def from_trimesh(meshes: list[trimesh.Trimesh]) -> Multisphere:
+        print(f"---------Multisphere.from_trimesh---------")
+        print(f"meshes: {meshes}")
+        print(f"len(meshes): {len(meshes)}")
+
 
 @jdc.pytree_dataclass
 class Heightmap(CollGeom):

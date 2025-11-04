@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 from .._robot_urdf_parser import RobotURDFParser
 from ._collision import collide, pairwise_collide
-from ._geometry import Capsule, CollGeom
+from ._geometry import Capsule, CollGeom, Multisphere
 
 
 @jdc.pytree_dataclass
@@ -40,6 +40,7 @@ class RobotCollision:
         urdf: yourdfpy.URDF,
         user_ignore_pairs: tuple[tuple[str, str], ...] = (),
         ignore_immediate_adjacents: bool = True,
+        multisphere: bool = False,
     ):
         """
         Build a differentiable robot collision model from a URDF.
@@ -68,18 +69,35 @@ class RobotCollision:
 
         # Gather all collision meshes.
         # The order of cap_list must match link_name_list.
-        cap_list = list[Capsule]()
-        for link_name in link_name_list:
-            cap_list.append(
-                Capsule.from_trimesh(
-                    RobotCollision._get_trimesh_collision_geometries(urdf, link_name)
+        collgeoms = None
+        if not multisphere:
+            cap_list = list[Capsule]()
+            for link_name in link_name_list:
+                cap_list.append(
+                    Capsule.from_trimesh(
+                        RobotCollision._get_trimesh_collision_geometries(urdf, link_name)
+                    )
                 )
-            )
 
-        # Convert list of trimesh objects into a batched Capsule object.
-        capsules = cast(Capsule, jax.tree.map(lambda *args: jnp.stack(args), *cap_list))
-        assert capsules.get_batch_axes() == (link_info.num_links,)
+            # Convert list of trimesh objects into a batched Capsule object.
+            capsules = cast(Capsule, jax.tree.map(lambda *args: jnp.stack(args), *cap_list))
+            assert capsules.get_batch_axes() == (link_info.num_links,)
+            collgeoms = capsules
+        else: # multisphere
+            print("---------multisphere---------")
+            multisphere_list = list[Multisphere]()
+            for link_name in link_name_list:
+                print(f"link_name: {link_name}")
+                multisphere_list.append(
+                    Multisphere.from_trimesh(
+                        RobotCollision._get_trimesh_collision_geometries(urdf, link_name, separate_meshes=True)
+                    )
+                )
 
+            # Convert list of trimesh objects into a batched Capsule object.
+            multispheres = cast(Multisphere, jax.tree.map(lambda *args: jnp.stack(args), *cap_list))
+            assert multispheres.get_batch_axes() == (link_info.num_links,)
+            collgeoms = multispheres
         # Directly compute active pair indices
         active_idx_i, active_idx_j = RobotCollision._compute_active_pair_indices(
             link_names=link_name_list,
@@ -98,7 +116,7 @@ class RobotCollision:
             link_names=link_name_list,
             active_idx_i=active_idx_i,
             active_idx_j=active_idx_j,
-            coll=capsules,
+            coll=collgeoms,
         )
 
     @staticmethod
@@ -153,7 +171,7 @@ class RobotCollision:
 
     @staticmethod
     def _get_trimesh_collision_geometries(
-        urdf: yourdfpy.URDF, link_name: str
+        urdf: yourdfpy.URDF, link_name: str, separate_meshes: bool = False
     ) -> trimesh.Trimesh:
         """Extracts trimesh collision geometries for a given link name, applying relative transforms."""
         if link_name not in urdf.link_map:
@@ -227,10 +245,13 @@ class RobotCollision:
             if mesh is not None:
                 # Apply the transform specified in the URDF collision tag
                 mesh.apply_transform(transform)
+                print(f"Loaded mesh for link '{link_name}': {mesh.vertices.shape}")
                 coll_meshes.append(mesh)
-
-        coll_mesh = sum(coll_meshes, trimesh.Trimesh())
-        return coll_mesh
+        if separate_meshes:
+            return coll_meshes
+        else:
+            coll_mesh = sum(coll_meshes, trimesh.Trimesh())
+            return coll_mesh
 
     @jdc.jit
     def at_config(
